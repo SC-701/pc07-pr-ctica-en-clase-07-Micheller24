@@ -1,9 +1,7 @@
-﻿using Abstracciones.Interfaces.Reglas;
-
-using Abstracciones.Modelos;
-
+﻿using Abstracciones.Modelos;
 using Abstracciones.Servicios;
-using System.Net.Http;
+using Microsoft.Extensions.Configuration;
+
 using System.Net.Http.Headers;
 using System.Text.Json;
 
@@ -11,12 +9,12 @@ namespace Servicios
 {
     public class TipoCambioServicio : ITipoCambioServicio
     {
-        private readonly IConfiguracion _configuracion;
-        private readonly System.Net.Http.IHttpClientFactory _httpClient;
+        private readonly IConfiguration _configuracion;
+        private readonly IHttpClientFactory _httpClient;
 
         public TipoCambioServicio(
-            IConfiguracion configuracion,
-            System.Net.Http.IHttpClientFactory httpClient)
+            IConfiguration configuracion,
+            IHttpClientFactory httpClient)
         {
             _configuracion = configuracion;
             _httpClient = httpClient;
@@ -24,23 +22,37 @@ namespace Servicios
 
         public async Task<decimal> ObtenerTipoCambioVenta()
         {
-            var endpoint = _configuracion.ObtenerMetodo("ApiEndPointsTipoCambio", "ObtenerTipoCambioVenta");
-            var bearerToken = _configuracion.ObtenerValor("BancoCentralToken");
+           
+            string endpoint = _configuracion["ApiEndPointsTipoCambio:ObtenerTipoCambioVenta"] ?? string.Empty;
+            string bearerToken = _configuracion["BancoCentralToken"] ?? string.Empty;
 
+            if (string.IsNullOrWhiteSpace(endpoint))
+            {
+                throw new Exception("No se encontró el endpoint del tipo de cambio en appsettings.");
+            }
+
+            if (string.IsNullOrWhiteSpace(bearerToken))
+            {
+                throw new Exception("No se encontró el token del Banco Central en appsettings.");
+            }
+
+          
             var servicioTipoCambio = _httpClient.CreateClient("ServicioTipoCambio");
 
             servicioTipoCambio.DefaultRequestHeaders.Clear();
             servicioTipoCambio.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", bearerToken);
 
+          
             string fechaActual = DateTime.Today.ToString("yyyy/MM/dd");
             string url = string.Format(endpoint, fechaActual, fechaActual);
 
             var respuesta = await servicioTipoCambio.GetAsync(url);
             respuesta.EnsureSuccessStatusCode();
 
-            var resultado = await respuesta.Content.ReadAsStringAsync();
+            string resultado = await respuesta.Content.ReadAsStringAsync();
 
+        
             var opciones = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -48,6 +60,7 @@ namespace Servicios
 
             var resultadoDeserializado = JsonSerializer.Deserialize<TipoCambioResponse>(resultado, opciones);
 
+        
             var tipoCambio = resultadoDeserializado?
                 .datos?
                 .FirstOrDefault()?
