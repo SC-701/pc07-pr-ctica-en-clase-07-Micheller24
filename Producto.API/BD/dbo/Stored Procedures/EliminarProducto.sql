@@ -1,0 +1,9 @@
+﻿CREATE PROCEDURE dbo.EliminarProducto
+    @Id UNIQUEIDENTIFIER
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DELETE FROM Producto
+    WHERE Id = @Id;
+END;
